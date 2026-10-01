@@ -42,6 +42,8 @@ print(checks, err, circ.resources()["toffoli_total"])
     python verify_isometry.py          # circuit checks, about 1 minute
     python verify_isometry.py --aer    # adds the Qiskit Aer cross-check, about 5 minutes
     python verify_square.py            # Sec. 4 numerics, about 10 minutes
+    python verify_full_unitary.py      # full-unitary error of U_V, about 10 minutes
+    python verify_qsvt_degree.py       # QSVT degree and sup norm, a few seconds
 
 ## Layout
 
@@ -54,6 +56,8 @@ print(checks, err, circ.resources()["toffoli_total"])
 | `verify_isometry.py` | Arithmetic, factorization, circuit, and scaling checks |
 | `verify_isometry_aer.py` | The exported circuit in Qiskit Aer (MPS) for every wavenumber at N = 4 |
 | `verify_square.py` | Condition numbers of `K^chi` and of the preconditioned operator, and the encoding of `M`, for a square inclusion |
+| `verify_full_unitary.py` | Full 16 x 16 error of the wavenumber-controlled stage against the exact-angle unitary (42 cases) |
+| `verify_qsvt_degree.py` | Degree and sup norm of the odd QSVT inverse polynomial against the bounds of Sec. 3.5 |
 
 ## Factorization
 
@@ -73,9 +77,12 @@ arithmetic is then reversed so that every work wire returns to zero.
 ## What is verified
 
 - Adders exhaustively; CORDIC to its truncation error.
-- Closed-form factorization to 3e-15 for every `k`, `nu` in {-0.3, 0, 0.35, 0.45}.
-- Gate-level simulation for every `k`, `N` = 4 ... 256, `F` = 12 ... 32
-  (39 cases): work register clean in every case, block error `delta <= 7 N 2^-F`.
+- Closed-form factorization to 3.1e-15 for every `k` at `N` = 8 and 64,
+  `nu` in {-0.3, 0, 0.35, 0.45}.
+- Gate-level simulation for every `k`, `N` = 4 ... 256, `F` = 12, 16, ..., 32
+  (42 cases): work register clean and inputs restored in every case; error
+  `delta <= 7 N 2^-F`, where `delta` is the full 16 x 16 error against the
+  exact-angle unitary, at most 1.75 times the 12 x 2 block error.
 - Dense `U_V`, with the QFT built from gates, against `V` assembled element by
   element (N = 8, 16).
 - The exported 727-qubit circuit in Qiskit Aer (MPS) for every `k` at N = 4,
@@ -85,11 +92,15 @@ arithmetic is then reversed so that every work wire returns to zero.
   the condition number of `K^chi` seen by QSVT grows by 4.03 to 4.26 per
   doubling of `N`; the block of `U_V^dag U_E U_V` from the gate-level circuit
   matches `M + cbar Pi_0` to below `2 delta`.
+- QSVT inverse polynomial (odd, Gribling et al. Cor. 12): degree
+  `d <= rho ln(2/eps_p) + 1`, attained to within 1 for `rho >= 10`; sup norm on
+  [-1, 1] equal to 1.30 rho (eps_p = 1e-3) and 1.76 rho (eps_p = 1e-6), below
+  the bound `rho max(1 + eps_p, (ln(2/eps_p)/2 + 1/rho)^{1/2})`.
 
 ## Cost per application of U_V
 
-Toffoli = 51 F^2 + 196 F + 38 + 4 log2 N (exact in all 39 cases), with
-`F = ceil(log2(7 N / delta))` for block error `delta`; 5F + 3 controlled
+Toffoli = 51 F^2 + 196 F + 38 + 4 log2 N (exact in all 42 cases), with
+`F = ceil(log2(7 N / delta))` for full-unitary error `delta`; 5F + 3 controlled
 single-qubit rotations; about 4 F^2 qubits. For N = 1024 and delta = 1e-6:
 F = 33, 62,270 Toffolis, 4,170 qubits.
 
