@@ -86,7 +86,7 @@ arithmetic is then reversed so that every work wire returns to zero.
 - Dense `U_V`, with the QFT built from gates, against `V` assembled element by
   element (N = 8, 16).
 - The exported 727-qubit circuit in Qiskit Aer (MPS) for every `k` at N = 4,
-  agreeing to 9e-10.
+  agreeing to 6.5e-10.
 - Square inclusion, plane strain, `nu = 0.35`, `v_f = 1/4`, `N` = 8 ... 64,
   `rho` = 1.5 ... 1e4: `kappa(M) = rho` exactly (the bound is attained), while
   the condition number of `K^chi` seen by QSVT grows by 4.03 to 4.26 per
