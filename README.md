@@ -44,7 +44,8 @@ print(checks, err, circ.resources()["toffoli_total"])
     python verify_square.py            # Sec. 4 numerics, about 10 minutes
     python verify_full_unitary.py      # full-unitary error of U_V, about 10 minutes
     python verify_qsvt_degree.py       # QSVT degree and sup norm, a few seconds
-    python verify_inverse.py           # preconditioned inverse on four loads, about 5 minutes
+    python verify_inverse.py           # preconditioned inverse on four loads, about 2 minutes
+    python makeTables.py               # Tables 1-3 of the paper as LaTeX in tables/, about 6 minutes
 
 ## Layout
 
@@ -58,6 +59,7 @@ print(checks, err, circ.resources()["toffoli_total"])
 | `verify_isometry_aer.py` | The exported circuit in Qiskit Aer (MPS) for every wavenumber at N = 4 |
 | `verify_square.py` | Condition numbers of `K^chi` and of the preconditioned operator, and the encoding of `M`, for a square inclusion |
 | `verify_full_unitary.py` | Full 16 x 16 error of the wavenumber-controlled stage against the exact-angle unitary (42 cases) |
+| `makeTables.py` | Writes the `tabular` of each table in Sec. 4 to `tables/*.tex`, after asserting every claim the text makes about it |
 | `verify_inverse.py` | The preconditioned inverse applied to four loads, against the finite element solution in the energy norm, with FFT-PCG iteration counts |
 | `verify_qsvt_degree.py` | Degree and sup norm of the odd QSVT inverse polynomial against the bounds of Sec. 3.5 |
 
@@ -96,9 +98,9 @@ arithmetic is then reversed so that every work wire returns to zero.
   matches `M + cbar Pi_0` to below `2 delta`.
 - Preconditioned inverse (exact `Mtilde`, and the gate-level block at N = 8, 16):
   relative energy-norm error <= eps_p = 1e-6 for smooth, random, cell-problem
-  and worst-case loads, N = 8 ... 64, rho = 10 and 1e4; the worst-case load
-  attains the residual of the polynomial. FFT-PCG reaches the same error in
-  12 to 20 iterations, against d = 145 and 145,087 QSVT queries.
+  and worst-case loads, N = 8 ... 64, rho = 10; the worst-case load attains
+  the residual of the polynomial. FFT-PCG reaches the same error in 12 to 14
+  iterations, against d = 145 QSVT queries.
 - QSVT inverse polynomial (odd, Gribling et al. Cor. 12): degree
   `d <= rho ln(2/eps_p) + 1`, attained to within 1 for `rho >= 10`; sup norm on
   [-1, 1] equal to 1.30 rho (eps_p = 1e-3) and 1.76 rho (eps_p = 1e-6), below

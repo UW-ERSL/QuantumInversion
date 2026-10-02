@@ -13,23 +13,32 @@ import numpy as np
 from quantuminversion.isometry_circuit import (IsometryCircuit, T_matrix, F0_matrix, Rpair,
                                                 Rpsi, Rq0, exact_angles, vhat_exact)
 
-nu = 0.35
-T, F0 = T_matrix(nu), F0_matrix(nu)
-print(f"{'N':>4} {'F':>3} {'block err':>10} {'full err':>10} {'ratio':>6} {'7N2^-F':>8} {'ok':>3}")
-for n in range(2, 9):
-    for F in (12, 16, 20, 24, 28, 32):
-        c = IsometryCircuit(n=n, nu=nu, F=F); N = c.N
-        Q, chk = c.simulate()
-        blk = full = 0.0
-        for kk in range(1, N * N):
-            k1, k2 = divmod(kk, N)
-            b, p1, p2 = exact_angles(N, nu, k1, k2)
-            if k1 == k2 == N // 2:
-                b = c.decoded['beta'][kk]
-            Qex = np.exp(1j * np.pi * (k1 + k2) / N) * T @ Rpair(2 * b, b) @ F0 @ Rpsi(p1, p2) @ Rq0(-b)
-            full = max(full, np.linalg.norm(Q[kk] - Qex, 2))
-            blk = max(blk, np.linalg.norm(Q[kk][:12, :2] - vhat_exact(N, nu, k1, k2), 2))
-        bound = 7 * N * 2.0 ** -F
-        ok = full <= bound and chk['work_bits_left_set'] == 0 and chk['inputs_restored']
-        print(f"{N:4d} {F:3d} {blk:10.2e} {full:10.2e} {full / blk:6.2f} {bound:8.1e} "
-              f"{'yes' if ok else 'NO':>3}", flush=True)
+
+
+def full_error(n, F, nu=0.35):
+    """(block error, full 16 x 16 error, checks) of U_V at N = 2^n and F bits."""
+    T, F0 = T_matrix(nu), F0_matrix(nu)
+    c = IsometryCircuit(n=n, nu=nu, F=F); N = c.N
+    Q, chk = c.simulate()
+    blk = full = 0.0
+    for kk in range(1, N * N):
+        k1, k2 = divmod(kk, N)
+        b, p1, p2 = exact_angles(N, nu, k1, k2)
+        if k1 == k2 == N // 2:
+            b = c.decoded['beta'][kk]
+        Qex = np.exp(1j * np.pi * (k1 + k2) / N) * T @ Rpair(2 * b, b) @ F0 @ Rpsi(p1, p2) @ Rq0(-b)
+        full = max(full, np.linalg.norm(Q[kk] - Qex, 2))
+        blk = max(blk, np.linalg.norm(Q[kk][:12, :2] - vhat_exact(N, nu, k1, k2), 2))
+    return blk, full, chk
+
+
+if __name__ == "__main__":
+    print(f"{'N':>4} {'F':>3} {'block err':>10} {'full err':>10} {'ratio':>6} {'7N2^-F':>8} {'ok':>3}")
+    for n in range(2, 9):
+        for F in (12, 16, 20, 24, 28, 32):
+            blk, full, chk = full_error(n, F)
+            N = 2 ** n
+            bound = 7 * N * 2.0 ** -F
+            ok = full <= bound and chk['work_bits_left_set'] == 0 and chk['inputs_restored']
+            print(f"{N:4d} {F:3d} {blk:10.2e} {full:10.2e} {full / blk:6.2f} {bound:8.1e} "
+                  f"{'yes' if ok else 'NO':>3}", flush=True)

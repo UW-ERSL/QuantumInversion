@@ -1,6 +1,6 @@
 """verify_inverse -- the preconditioned inverse applied to specific loads (Sec. 4).
 
-    python verify_inverse.py           # about 5 minutes
+    python verify_inverse.py           # about 2 minutes
 
 u_Q = E_max^{-1} (K^+)^{1/2} q_t(Mtilde) (K^+)^{1/2} f, with q_t the odd QSVT
 polynomial of Sec. 3.5, is compared with the finite element solution
@@ -102,34 +102,51 @@ def apply_inverse(q, Kih, lam, U, cbar, f):
     return Kih(U @ (q(lt) * (U.conj().T @ Kih(f))))
 
 
+def inverse_case(N, rho, eps, F_bits=()):
+    """Energy-norm errors of u_Q for the four loads, the QSVT degree d, the
+    largest PCG iteration count, and the errors with Mtilde from the
+    gate-level circuit for each F in F_bits."""
+    q, d = q_poly(rho, eps)
+    G, Wh = assemble(N)
+    A = (Wh @ G).tocsr()
+    chi = square_chi(N)
+    Et = np.repeat(np.where(chi == 1, 1.0, 1 / rho), 12)
+    Kc = (A.T @ sp.diags(Et) @ A).tocsr()                       # K^chi / E_max
+    Kih, Kh, Kinv = (k_function(g, N) for g in (lambda e: e ** -0.5, np.sqrt, lambda e: 1 / e))
+    M = Kih(Kc @ Kih(np.eye(2 * N * N)))
+    lam, U = np.linalg.eigh((M + M.T) / 2)
+    del M
+    cbar = chi.mean() + (1 - chi.mean()) / rho
+    F_ = loads(N, A, Et, Kh, lam, U)
+    sols = {k: fe_solve(Kc, f) for k, f in F_.items()}
+    errs = {k: energy_error(Kc, sols[k], apply_inverse(q, Kih, lam, U, cbar, F_[k])) for k in LOADS}
+    pcg = max(pcg_iterations(Kc, Kinv, F_[k], sols[k], eps) for k in LOADS)
+    circ = {}
+    for Fb in F_bits:                                           # Mtilde from the gate-level circuit
+        Mc, chk = circuit_block(N, rho, Fb)
+        lc, Uc = np.linalg.eigh((Mc + Mc.conj().T) / 2)
+        circ[Fb] = {k: energy_error(Kc, sols[k], apply_inverse(q, Kih, lc, Uc, cbar,
+                                                               F_[k].astype(complex)).real) for k in LOADS}
+    return dict(d=d, pcg=pcg, errs=errs, circuit=circ)
+
+
+def residual(rho, eps):
+    """Largest |x q_t(x) - 1| on [1/rho, 1], that is, 1/T_t(s)."""
+    a = 1 / rho ** 2
+    t = int(np.ceil(0.5 * rho * np.log(2 / eps)))
+    return 1 / np.cosh(t * np.arccosh((1 + a) / (1 - a)))
+
+
+LOADS = ("smooth", "random", "cell", "worst")
+
 # ---- main ------------------------------------------------------------------
 if __name__ == "__main__":
-    eps = 1e-6
-    names = ("smooth", "random", "cell", "worst")
-    print(f"{'N':>3} {'rho':>6} {'F':>4} {'d':>7} {'PCG':>4}  " + "  ".join(f"{k:>9}" for k in names))
-    for rho in (10.0, 1e4):
-        q, d = q_poly(rho, eps)
-        for N in (8, 16, 32, 64):
-            G, Wh = assemble(N)
-            A = (Wh @ G).tocsr()
-            chi = square_chi(N)
-            Et = np.repeat(np.where(chi == 1, 1.0, 1 / rho), 12)
-            Kc = (A.T @ sp.diags(Et) @ A).tocsr()               # K^chi / E_max
-            Kih, Kh, Kinv = (k_function(g, N) for g in (lambda e: e ** -0.5, np.sqrt, lambda e: 1 / e))
-            M = Kih(Kc @ Kih(np.eye(2 * N * N)))
-            lam, U = np.linalg.eigh((M + M.T) / 2)
-            del M
-            cbar = chi.mean() + (1 - chi.mean()) / rho
-            F_ = loads(N, A, Et, Kh, lam, U)
-            sols = {k: fe_solve(Kc, f) for k, f in F_.items()}
-            errs = [energy_error(Kc, sols[k], apply_inverse(q, Kih, lam, U, cbar, F_[k])) for k in names]
-            its = max(pcg_iterations(Kc, Kinv, F_[k], sols[k], eps) for k in names)
-            print(f"{N:3d} {rho:6g} {'-':>4} {d:7d} {its:4d}  " + "  ".join(f"{e:9.2e}" for e in errs), flush=True)
-            if rho == 10.0 and N <= 16:                          # Mtilde from the gate-level circuit
-                for Fb in (24, 32):
-                    Mc, chk = circuit_block(N, rho, Fb)
-                    lc, Uc = np.linalg.eigh((Mc + Mc.conj().T) / 2)
-                    errs = [energy_error(Kc, sols[k], apply_inverse(q, Kih, lc, Uc, cbar, F_[k].astype(complex)).real)
-                            for k in names]
-                    print(f"{N:3d} {rho:6g} {Fb:4d} {d:7d} {'':>4}  " + "  ".join(f"{e:9.2e}" for e in errs), flush=True)
-            del lam, U
+    eps, rho = 1e-6, 10.0
+    print(f"{'N':>3} {'rho':>6} {'F':>4} {'d':>7} {'PCG':>4}  " + "  ".join(f"{k:>9}" for k in LOADS))
+    for N in (8, 16, 32, 64):
+        r = inverse_case(N, rho, eps, F_bits=(24, 32) if N <= 16 else ())
+        print(f"{N:3d} {rho:6g} {'-':>4} {r['d']:7d} {r['pcg']:4d}  " +
+              "  ".join(f"{r['errs'][k]:9.2e}" for k in LOADS), flush=True)
+        for Fb, e in r["circuit"].items():
+            print(f"{N:3d} {rho:6g} {Fb:4d} {r['d']:7d} {'':>4}  " +
+                  "  ".join(f"{e[k]:9.2e}" for k in LOADS), flush=True)
