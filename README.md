@@ -99,10 +99,13 @@ arithmetic is then reversed so that every work wire returns to zero.
 
 ## Cost per application of U_V
 
-Toffoli = 51 F^2 + 196 F + 38 + 4 log2 N (exact in all 42 cases), with
+Toffoli = 51 F^2 + 196 F + 38 + 4 log2 N (exact in all 42 cases, which use
+nu = 0.35 and F a multiple of 4; within 3.2% for -0.3 <= nu <= 0.49 and
+12 <= F <= 36, since the constant multiplications depend on the bits of the
+material constants), with
 `F = ceil(log2(7 N / delta))` for full-unitary error `delta`; 5F + 3 controlled
 single-qubit rotations; about 4 F^2 qubits. For N = 1024 and delta = 1e-6:
-F = 33, 62,270 Toffolis, 4,170 qubits.
+F = 33, 62,270 Toffolis (circuit count), 4,170 qubits.
 
 ## What is NOT established
 

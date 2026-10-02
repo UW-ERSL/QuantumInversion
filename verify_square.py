@@ -99,10 +99,11 @@ def alpha_two_phase(rho, nu=NU):
         6 * (1 + nu) * (1 - 2 * nu))
 
 
-def cheb_degree(kappa, eps):
-    """Smallest d with max_{[1/kappa,1]} |x p(x) - 1| = 1/T_d((kappa+1)/(kappa-1)) <= eps."""
-    g = (kappa + 1) / (kappa - 1)
-    return int(np.ceil(np.arccosh(1 / eps) / np.arccosh(g)))
+def qsvt_degree(kappa, eps):
+    """Degree 2t - 1 of the odd QSVT polynomial x q_t(x) = 1 - r_t(x^2) with relative residual eps on [1/kappa, 1]."""
+    a = 1 / kappa ** 2
+    t = int(np.ceil(np.arccosh(1 / eps) / np.arccosh((1 + a) / (1 - a))))
+    return 2 * t - 1
 
 
 def prop3_check(N, rho, F):
@@ -149,6 +150,6 @@ if __name__ == "__main__":
         a = alpha_two_phase(r["rho"])
         k_un = a / r["Kmin"]
         out["degree"].append(dict(N=r["N"], rho=r["rho"], alpha=a, kappa_unpre=k_un,
-                                  d_unpre=cheb_degree(k_un, 1e-6),
-                                  d_pre_bound=cheb_degree(r["rho"], 1e-6) if r["rho"] > 1 else 0))
+                                  d_unpre=qsvt_degree(k_un, 1e-6),
+                                  d_pre=qsvt_degree(r["rho"], 1e-6) if r["rho"] > 1 else 0))
     json.dump(out, open("square_numerics.json", "w"), indent=1)
