@@ -106,15 +106,9 @@ def qsvt_degree(kappa, eps):
     return 2 * t - 1
 
 
-def prop3_check(N, rho, F):
-    """Block of U_V^dag U_E U_V on the input subspace, from the gate-level circuit, vs M + cbar Pi_0."""
-    A, Et, K, Kc, chi = operators(N, rho)
-    Kih = circulant(lambda e: e ** -0.5, N)
-    M = Kih @ Kc @ Kih
-    cbar = chi.mean() + (1 - chi.mean()) / rho
-    one = np.ones((N * N, 1)) / N
-    Pi0 = np.kron(one @ one.T, np.eye(2))
-    Mt = M + cbar * Pi0
+def circuit_block(N, rho, F):
+    """Block of U_V^dag U_E U_V on the input subspace, from the gate-level circuit."""
+    chi = square_chi(N)
     circ = IsometryCircuit(int(np.log2(N)), nu=NU, F=F)
     Q, chk = circ.simulate()
     F1 = np.exp(-2j * np.pi * np.outer(np.arange(N), np.arange(N)) / N) / np.sqrt(N)
@@ -124,7 +118,19 @@ def prop3_check(N, rho, F):
         BD[16 * k:16 * k + 16, 2 * k:2 * k + 2] = Q[k, :, :2]          # all 16 rows
     X = np.kron(Fm.conj().T, np.eye(16)) @ BD @ np.kron(Fm, np.eye(2))  # U_V on the input subspace
     Ee = np.repeat(np.where(chi == 1, 1.0, 1 / rho), 16)                # U_E block: Etilde_e x I_16
-    Mc = X.conj().T @ (Ee[:, None] * X)
+    return X.conj().T @ (Ee[:, None] * X), chk
+
+
+def prop3_check(N, rho, F):
+    """Block of U_V^dag U_E U_V on the input subspace, from the gate-level circuit, vs M + cbar Pi_0."""
+    A, Et, K, Kc, chi = operators(N, rho)
+    Kih = circulant(lambda e: e ** -0.5, N)
+    M = Kih @ Kc @ Kih
+    cbar = chi.mean() + (1 - chi.mean()) / rho
+    one = np.ones((N * N, 1)) / N
+    Pi0 = np.kron(one @ one.T, np.eye(2))
+    Mt = M + cbar * Pi0
+    Mc, chk = circuit_block(N, rho, F)
     lm = np.linalg.eigvalsh((Mc + Mc.conj().T) / 2)
     return dict(N=N, rho=rho, F=F, err=float(np.linalg.norm(Mc - Mt, 2)),
                 spec_min=float(lm.min()), spec_max=float(lm.max()), cbar=float(cbar),
@@ -141,7 +147,7 @@ if __name__ == "__main__":
             print({k: (round(v, 5) if isinstance(v, float) else v) for k, v in r.items()},
                   f"{time.time()-t:.0f}s", flush=True)
     for N in (8, 16):
-        for rho in (3.75, 1e4):
+        for rho in (10.0,):
             for F in (24, 32):
                 r = prop3_check(N, rho, F)
                 out["prop3"].append(r)
